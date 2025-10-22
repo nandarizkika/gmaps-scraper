@@ -12,14 +12,26 @@ A web interface for the Google Maps scraper that allows users to:
 import streamlit as st
 import pandas as pd
 import os
+import sys
 import time
 from datetime import datetime
 from io import BytesIO
 import tempfile
 import shutil
 
+# Add the parent directory to the path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 # Import scraper components
-from gmaps_scraper import ScraperConfig, ScraperOrchestrator, TaskGenerator
+try:
+    from config.settings import ScraperConfig
+    from core.orchestrator import ScraperOrchestrator
+    from utils.task_generator import TaskGenerator
+except ImportError:
+    # Alternative import for different structures
+    from gmaps_scraper.config.settings import ScraperConfig
+    from gmaps_scraper.core.orchestrator import ScraperOrchestrator
+    from gmaps_scraper.utils.task_generator import TaskGenerator
 
 # Page configuration
 st.set_page_config(
