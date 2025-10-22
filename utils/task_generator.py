@@ -3,7 +3,7 @@ Utility for generating search tasks from keywords and locations
 """
 import pandas as pd
 from typing import List
-from ..models.place import SearchTask
+from models.place import SearchTask
 
 
 class TaskGenerator:

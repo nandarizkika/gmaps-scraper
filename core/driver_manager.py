@@ -13,7 +13,7 @@ from selenium.common.exceptions import TimeoutException
 import os
 from typing import Optional
 
-from ..config.settings import ScraperConfig
+from config.settings import ScraperConfig
 
 
 class DriverManager:
@@ -52,11 +52,17 @@ class DriverManager:
         if self.config.proxy:
             chrome_options.add_argument(f'--proxy-server={self.config.proxy}')
         
-        # Temporary profile directory
+        # FIX: Unique temporary profile directory for each thread
+        import uuid
+        import threading
         try:
-            temp_dir = os.path.join(os.getcwd(), "temp_browser_data")
+            # Create unique directory using UUID and thread ID
+            thread_id = threading.current_thread().ident
+            unique_id = f"{thread_id}_{uuid.uuid4().hex[:8]}"
+            temp_dir = os.path.join(os.getcwd(), "temp_browser_data", unique_id)
             os.makedirs(temp_dir, exist_ok=True)
             chrome_options.add_argument(f"--user-data-dir={temp_dir}")
+            print(f"Using browser profile: {temp_dir}")
         except Exception as e:
             print(f"Warning: Could not create custom cache directory: {e}")
         

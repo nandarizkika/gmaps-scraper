@@ -14,7 +14,7 @@ from .extractors import (
     parse_reviews_count
 )
 
-from .task_generator import (
+from utils.task_generator import (
     TaskGenerator,
     JAKARTA_SELATAN_DISTRICTS,
     JAKARTA_PUSAT_DISTRICTS,

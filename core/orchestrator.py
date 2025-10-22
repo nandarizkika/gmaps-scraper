@@ -9,10 +9,10 @@ from threading import Lock
 from typing import List, Optional
 from datetime import datetime
 
-from ..models.place import SearchTask, Place
-from ..config.settings import ScraperConfig
-from ..core.driver_manager import DriverManager
-from ..core.search_engine import MapsSearchEngine
+from models.place import SearchTask, Place
+from config.settings import ScraperConfig
+from core.driver_manager import DriverManager
+from core.search_engine import MapsSearchEngine
 
 
 class ScraperOrchestrator:

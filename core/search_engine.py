@@ -10,10 +10,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 
-from ..models.place import SearchTask, Place
-from ..config.settings import ScraperConfig
-from ..core.driver_manager import DriverManager
-from ..utils.extractors import (
+from models.place import SearchTask, Place
+from config.settings import ScraperConfig
+from core.driver_manager import DriverManager
+from utils.extractors import (
     extract_coordinates_from_link, 
     parse_address, 
     clean_text,
@@ -225,118 +225,179 @@ class MapsSearchEngine:
         
         return place_elements[:max_results]
     
-    def _extract_place_details(self, element, task: SearchTask) -> Optional[Place]:
-        """Extract detailed information from a place element"""
-        try:
-            # Click on the element to open details
+    def _extract_place_details(self, element, task: SearchTask, index: int = 0) -> Optional[Place]:
+        """Extract detailed information from a place element with retry logic"""
+        max_retries = 3
+        
+        for attempt in range(max_retries):
             try:
-                self.driver.execute_script("arguments[0].click();", element)
-            except:
-                # Try regular click as fallback
-                element.click()
-            
-            time.sleep(2)
-            
-            # Extract basic info with multiple selector attempts
-            name = self._extract_text_multi([
-                'h1.DUwDvf',
-                'h1.fontHeadlineLarge',
-                'h1[class*="title"]',
-                'h1'
-            ])
-            
-            if not name:
-                print("    Warning: Could not extract name")
-                return None
-            
-            category = self._extract_text_multi([
-                'button.DkEaL',
-                'button[jsaction*="category"]',
-                'div.LBgpqf button'
-            ])
-            
-            # Extract address with multiple attempts
-            address = self._extract_text_multi([
-                'button[data-item-id="address"]',
-                'div.rogA2c',
-                'button[data-tooltip*="Copy address"]',
-                'div[aria-label*="Address"]'
-            ])
-            
-            district, city, province, zip_code = parse_address(address) if address else (None, None, None, None)
-            
-            # Extract link (from current URL)
-            link = self.driver.current_url
-            
-            # Extract coordinates
-            latitude, longitude = extract_coordinates_from_link(link)
-            
-            # Extract rating and reviews with multiple attempts
-            rating_text = self._extract_text_multi([
-                'div.F7nice span[aria-hidden="true"]',
-                'span.ceNzKf',
-                'div[jsaction*="rating"] span'
-            ])
-            rating = parse_rating(rating_text)
-            
-            reviews_text = self._extract_text_multi([
-                'div.F7nice span[aria-label*="reviews"]',
-                'button[aria-label*="reviews"]',
-                'span[aria-label*="reviews"]'
-            ])
-            reviews_count = parse_reviews_count(reviews_text)
-            
-            # Extract contact info with multiple attempts
-            phone = self._extract_text_multi([
-                'button[data-item-id="phone:tel:"]',
-                'button[data-tooltip*="phone"]',
-                'button[aria-label*="Phone"]',
-                'a[href^="tel:"]'
-            ])
-            
-            website = self._extract_attribute('a[data-item-id="authority"]', 'href')
-            if not website:
-                website = self._extract_attribute('a[aria-label*="Website"]', 'href')
-            
-            # Extract opening hours
-            opening_hours = self._extract_opening_hours()
-            
-            # Extract star distribution
-            stars = self._extract_star_distribution()
-            
-            # Create Place object
-            place = Place(
-                name=clean_text(name),
-                category=clean_text(category),
-                address=clean_text(address),
-                district=clean_text(district),
-                city=clean_text(city),
-                province=clean_text(province),
-                zip_code=clean_text(zip_code),
-                latitude=latitude,
-                longitude=longitude,
-                rating=rating,
-                reviews_count=reviews_count,
-                phone=clean_text(phone),
-                website=clean_text(website),
-                google_maps_link=link,
-                opening_hours=clean_text(opening_hours),
-                star_1=stars.get(1),
-                star_2=stars.get(2),
-                star_3=stars.get(3),
-                star_4=stars.get(4),
-                star_5=stars.get(5),
-                search_keyword=task.keyword,
-                search_location=task.location
-            )
-            
-            return place
-            
-        except Exception as e:
-            print(f"Error extracting place details: {e}")
-            import traceback
-            traceback.print_exc()
-            return None
+                # Click on the element to open details
+                try:
+                    self.driver.execute_script("arguments[0].click();", element)
+                except Exception as click_error:
+                    # If stale, re-find the element
+                    if "stale element" in str(click_error).lower():
+                        if attempt < max_retries - 1:
+                            print(f"    Stale element on click, retry {attempt + 1}/{max_retries}")
+                            time.sleep(3)
+                            # Re-find all place elements and get the one at this index
+                            place_elements = self._get_place_elements()
+                            if index < len(place_elements):
+                                element = place_elements[index]
+                                continue
+                            else:
+                                print(f"    Could not re-find element at index {index}")
+                                return None
+                        else:
+                            raise
+                    # Try regular click as fallback
+                    try:
+                        element.click()
+                    except Exception:
+                        if attempt < max_retries - 1:
+                            print(f"    Click failed, retry {attempt + 1}/{max_retries}")
+                            time.sleep(3)
+                            continue
+                        else:
+                            raise
+                
+                time.sleep(3)
+                
+                # Extract basic info with multiple selector attempts
+                name = self._extract_text_multi([
+                    'h1.DUwDvf',
+                    'h1.fontHeadlineLarge',
+                    'h1[class*="title"]',
+                    'h1'
+                ])
+                
+                if not name:
+                    print("    Warning: Could not extract name")
+                    return None
+                
+                category = self._extract_text_multi([
+                    'button.DkEaL',
+                    'button[jsaction*="category"]',
+                    'div.LBgpqf button'
+                ])
+                
+                # Extract address with multiple attempts
+                address = self._extract_text_multi([
+                    'button[data-item-id="address"]',
+                    'div.rogA2c',
+                    'button[data-tooltip*="Copy address"]',
+                    'div[aria-label*="Address"]'
+                ])
+                
+                district, city, province, zip_code = parse_address(address) if address else (None, None, None, None)
+                
+                # Extract link (from current URL)
+                link = self.driver.current_url
+                
+                # Extract coordinates
+                latitude, longitude = extract_coordinates_from_link(link)
+                
+                # Extract rating and reviews with multiple attempts
+                rating_text = self._extract_text_multi([
+                    'div.F7nice span[aria-hidden="true"]',
+                    'span.ceNzKf',
+                    'div[jsaction*="rating"] span'
+                ])
+                rating = parse_rating(rating_text)
+                
+                reviews_text = self._extract_text_multi([
+                    'div.F7nice span[aria-label*="reviews"]',
+                    'button[aria-label*="reviews"]',
+                    'span[aria-label*="reviews"]'
+                ])
+                reviews_count = parse_reviews_count(reviews_text)
+                
+                # Extract contact info with multiple attempts
+                phone = self._extract_text_multi([
+                    'button[data-item-id="phone:tel:"]',
+                    'button[data-tooltip*="phone"]',
+                    'button[aria-label*="Phone"]',
+                    'a[href^="tel:"]'
+                ])
+                
+                website = self._extract_attribute('a[data-item-id="authority"]', 'href')
+                if not website:
+                    website = self._extract_attribute('a[aria-label*="Website"]', 'href')
+                
+                # Extract opening hours
+                opening_hours = self._extract_opening_hours()
+                
+                # Extract star distribution
+                stars = self._extract_star_distribution()
+                
+                # Create Place object
+                place = Place(
+                    name=clean_text(name),
+                    category=clean_text(category),
+                    address=clean_text(address),
+                    district=clean_text(district),
+                    city=clean_text(city),
+                    province=clean_text(province),
+                    zip_code=clean_text(zip_code),
+                    latitude=latitude,
+                    longitude=longitude,
+                    rating=rating,
+                    reviews_count=reviews_count,
+                    phone=clean_text(phone),
+                    website=clean_text(website),
+                    google_maps_link=link,
+                    opening_hours=clean_text(opening_hours),
+                    star_1=stars.get(1),
+                    star_2=stars.get(2),
+                    star_3=stars.get(3),
+                    star_4=stars.get(4),
+                    star_5=stars.get(5),
+                    search_keyword=task.keyword,
+                    search_location=task.location
+                )
+                
+                # If we got here successfully, return the place
+                return place
+                
+            except Exception as e:
+                error_msg = str(e).lower()
+                
+                # Handle stale element exception with retry
+                if "stale element" in error_msg and attempt < max_retries - 1:
+                    print(f"    Stale element detected, retry {attempt + 1}/{max_retries}")
+                    time.sleep(1)
+                    # Re-find the element
+                    place_elements = self._get_place_elements()
+                    if index < len(place_elements):
+                        element = place_elements[index]
+                        continue
+                    else:
+                        print(f"    Could not re-find element at index {index}")
+                        return None
+                
+                # Handle invalid session (browser closed)
+                elif "invalid session" in error_msg:
+                    print(f"    Browser session lost: {e}")
+                    return None
+                
+                # On last attempt or non-retryable error, log and return None
+                else:
+                    if attempt == max_retries - 1:
+                        print(f"    Error extracting place details after {max_retries} attempts: {e}")
+                    else:
+                        print(f"    Error extracting place details: {e}")
+                        if attempt < max_retries - 1:
+                            print(f"    Retrying {attempt + 1}/{max_retries}...")
+                            time.sleep(1)
+                            continue
+                    
+                    import traceback
+                    traceback.print_exc()
+                    return None
+        
+        # If all retries exhausted
+        print(f"    Failed to extract place after {max_retries} attempts")
+        return None
     
     def _extract_text_multi(self, selectors: list) -> Optional[str]:
         """Try multiple selectors to extract text"""

@@ -23,16 +23,10 @@ import shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import scraper components
-try:
-    from config.settings import ScraperConfig
-    from core.orchestrator import ScraperOrchestrator
-    from utils.task_generator import TaskGenerator
-except ImportError:
-    # Alternative import for different structures
-    print("can't import config and orchestrator")
-    # from gmaps_scraper.config.settings import ScraperConfig
-    # from gmaps_scraper.core.orchestrator import ScraperOrchestrator
-    # from gmaps_scraper.utils.task_generator import TaskGenerator
+from config.settings import ScraperConfig
+from core.orchestrator import ScraperOrchestrator
+from utils.task_generator import TaskGenerator
+
 
 # Page configuration
 st.set_page_config(
