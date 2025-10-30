@@ -104,7 +104,7 @@ class ScraperOrchestrator:
         
         # Reorder columns for better readability
         column_order = [
-            'name', 'category', 'address', 'district', 'city', 'province', 'zip_code',
+            'name', 'category', 'address','subdistrict', 'district', 'city', 'province', 'zip_code',
             'latitude', 'longitude', 'rating', 'reviews_count',
             'phone', 'website', 'google_maps_link', 'opening_hours',
             'star_1', 'star_2', 'star_3', 'star_4', 'star_5',
@@ -191,6 +191,13 @@ class ScraperOrchestrator:
             for district, count in district_counts.items():
                 if district:
                     print(f"  - {district}: {count}")
+        
+        if 'subdistrict' in df.columns:
+            print(f"\nPlaces by District:")
+            subdistrict_counts = df['subdistrict'].value_counts().head(10)
+            for subdistrict, count in subdistrict_counts.items():
+                if subdistrict:
+                    print(f"  - {subdistrict}: {count}")
         
         if 'rating' in df.columns:
             ratings = df['rating'].dropna()

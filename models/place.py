@@ -12,6 +12,7 @@ class Place:
     name: str
     category: Optional[str] = None
     address: Optional[str] = None
+    subdistrict: Optional[str] = None  # Kelurahan
     district: Optional[str] = None  # Kecamatan
     city: Optional[str] = None
     province: Optional[str] = None
@@ -49,6 +50,9 @@ class SearchTask:
     keyword: str
     location: str
     max_results: int = 50
+    subdistrict: str = ""  # Optional subdistrict/kelurahan
+    district: str = ""     # Optional district/kecamatan  
+    city: str = ""         # Optional city
     
     def __str__(self):
         return f"{self.keyword} in {self.location}"

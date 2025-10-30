@@ -23,10 +23,15 @@ import shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import scraper components
-from config.settings import ScraperConfig
-from core.orchestrator import ScraperOrchestrator
-from utils.task_generator import TaskGenerator
-
+try:
+    from config.settings import ScraperConfig
+    from core.orchestrator import ScraperOrchestrator
+    from utils.task_generator import TaskGenerator
+except ImportError:
+    # Alternative import for different structures
+    from config.settings import ScraperConfig
+    from core.orchestrator import ScraperOrchestrator
+    from utils.task_generator import TaskGenerator
 
 # Page configuration
 st.set_page_config(
@@ -106,7 +111,15 @@ def validate_locations_file(df):
         return False, f"CSV must have columns: {', '.join(required_columns)}. Missing: {', '.join(missing_columns)}"
     if len(df) == 0:
         return False, "CSV file is empty"
-    return True, "Valid"
+    
+    # Check if subdistrict column exists (optional)
+    has_subdistrict = 'subdistrict' in df.columns
+    if has_subdistrict:
+        info_msg = "Valid (with subdistrict column)"
+    else:
+        info_msg = "Valid (without subdistrict - will use district only)"
+    
+    return True, info_msg
 
 
 def create_sample_keywords_csv():
@@ -129,10 +142,17 @@ def create_sample_locations_csv():
     sample_data = pd.DataFrame({
         'district': [
             'Kebayoran Baru',
+            'Kebayoran Baru',
+            'Kebayoran Baru',
             'Cilandak',
-            'Pancoran',
-            'Tebet',
-            'Pasar Minggu'
+            'Cilandak'
+        ],
+        'subdistrict': [
+            'Gunung',
+            'Melawai',
+            'Kramat Pela',
+            'Cilandak Barat',
+            'Cipete Selatan'
         ],
         'city': [
             'Jakarta Selatan',
@@ -147,18 +167,10 @@ def create_sample_locations_csv():
 
 def run_scraper(keywords_df, locations_df, config):
     """Run the scraper with given parameters"""
-    # Generate tasks
-    keywords = keywords_df['keyword'].tolist()
-    locations = []
-    
-    for _, row in locations_df.iterrows():
-        location = f"{row['district']}, {row['city']}"
-        locations.append(location)
-    
-    # Create search tasks
-    tasks = TaskGenerator.generate_tasks(
-        keywords=keywords,
-        locations=locations,
+    # Generate tasks using the new dataframe method
+    tasks = TaskGenerator.generate_from_dataframe(
+        keywords_df=keywords_df,
+        locations_df=locations_df,
         max_results_per_task=config['max_results_per_task']
     )
     
@@ -249,7 +261,8 @@ def main():
         - One keyword per row
         
         **Locations File:**
-        - Columns: `district`, `city`
+        - Required: `district`, `city`
+        - Optional: `subdistrict` (for more specific searches)
         - One location per row
         
         [Download sample files below] ↓

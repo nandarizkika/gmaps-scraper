@@ -22,6 +22,7 @@ class DriverManager:
     def __init__(self, config: ScraperConfig):
         self.config = config
         self.driver: Optional[webdriver.Chrome] = None
+        self.temp_dir: Optional[str] = None  # Track temp directory for cleanup
     
     def create_driver(self) -> webdriver.Chrome:
         """Create and configure Chrome WebDriver"""
@@ -52,11 +53,15 @@ class DriverManager:
         if self.config.proxy:
             chrome_options.add_argument(f'--proxy-server={self.config.proxy}')
         
-        # Temporary profile directory
+        # Temporary profile directory - UNIQUE for each browser instance
+        import tempfile
+        import uuid
+        import shutil
         try:
-            temp_dir = os.path.join(os.getcwd(), "temp_browser_data")
-            os.makedirs(temp_dir, exist_ok=True)
-            chrome_options.add_argument(f"--user-data-dir={temp_dir}")
+            # Create unique temp directory for each browser instance
+            unique_id = str(uuid.uuid4())[:8]
+            self.temp_dir = tempfile.mkdtemp(prefix=f"chrome_profile_{unique_id}_")
+            chrome_options.add_argument(f"--user-data-dir={self.temp_dir}")
         except Exception as e:
             print(f"Warning: Could not create custom cache directory: {e}")
         
@@ -125,13 +130,22 @@ class DriverManager:
             return False
     
     def quit(self):
-        """Close the driver"""
+        """Close the driver and cleanup temp directory"""
         if self.driver:
             try:
                 self.driver.quit()
             except:
                 pass
             self.driver = None
+        
+        # Cleanup temp directory
+        if self.temp_dir and os.path.exists(self.temp_dir):
+            try:
+                import shutil
+                shutil.rmtree(self.temp_dir, ignore_errors=True)
+            except:
+                pass
+            self.temp_dir = None
     
     def __enter__(self):
         """Context manager entry"""
