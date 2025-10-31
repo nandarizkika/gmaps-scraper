@@ -27,7 +27,7 @@ A powerful, multi-threaded Google Maps scraper built with Python and Selenium. E
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/gmaps-scraper.git
+git clone https://github.com/nandarizkika/gmaps-scraper.git
 cd gmaps-scraper
 ```
 
@@ -319,8 +319,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- 🐛 [Report Bug](https://github.com/YOUR_USERNAME/gmaps-scraper/issues)
-- 💡 [Request Feature](https://github.com/YOUR_USERNAME/gmaps-scraper/issues)
+- 🐛 [Report Bug](https://github.com/nandarizkika/gmaps-scraper/issues)
+- 💡 [Request Feature](https://github.com/nandarizkika/gmaps-scraper/issues)
 - 📧 Email: your.email@example.com
 
 ## ⭐ Star History
