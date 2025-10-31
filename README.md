@@ -1,334 +1,332 @@
-# Google Maps Scraper - Modular & Multi-threaded
+# 🗺️ Google Maps Scraper
 
-A modular, production-ready Google Maps scraper with multi-threading support. Perfect for extracting merchant data across multiple regions.
+A powerful, multi-threaded Google Maps scraper built with Python and Selenium. Extract business data including names, addresses, coordinates, ratings, reviews, contact info, and more.
+
+![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
+![Selenium](https://img.shields.io/badge/selenium-4.0+-green.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 ## ✨ Features
 
-- **Modular Architecture**: Clean separation of concerns (models, core, utils, config)
-- **Multi-threaded**: Scrape multiple locations simultaneously for faster results
-- **Thread-safe**: Proper locking mechanisms to prevent data corruption
-- **Duplicate Detection**: Automatically filters duplicate entries
-- **Comprehensive Data**: Extracts 20+ fields including ratings, coordinates, contact info
-- **Error Handling**: Robust retry mechanisms and graceful failure handling
-- **Progress Tracking**: Real-time progress updates and summaries
-- **Multiple Output Formats**: Saves to both CSV and Excel
+- 🚀 **Multi-threaded scraping** - Scrape multiple locations simultaneously
+- 🎯 **Comprehensive data extraction** - Names, addresses, coordinates, ratings, reviews, phone, website, opening hours
+- 📊 **Multiple output formats** - CSV and Excel
+- 🌐 **Web interface** - Built-in Streamlit app for easy use
+- 🔄 **Automatic deduplication** - Removes duplicate entries
+- ⚙️ **Highly configurable** - Adjust threads, delays, scroll limits, and more
+- 🇮🇩 **Indonesian address parsing** - Extracts subdistrict, district, city, province, ZIP
 
-## 📁 Project Structure
+## 📋 Prerequisites
 
-```
-gmaps_scraper/
-├── config/
-│   └── settings.py          # Configuration settings
-├── core/
-│   ├── driver_manager.py    # Browser automation manager
-│   ├── search_engine.py     # Google Maps search and extraction
-│   └── orchestrator.py      # Multi-threaded orchestration
-├── models/
-│   └── place.py             # Data models (Place, SearchTask)
-├── utils/
-│   ├── extractors.py        # Data extraction utilities
-│   └── task_generator.py    # Task generation helpers
-├── example_jaksel.py        # Example: Jakarta Selatan districts
-├── example_custom.py        # Example: Custom keywords/locations
-└── requirements.txt         # Dependencies
-```
+- Python 3.8 or higher
+- Chrome browser
+- ChromeDriver (automatically managed by Selenium)
 
-## 🚀 Installation
+## 🚀 Quick Start
 
-### 1. Clone or Download
+### 1. Clone the Repository
 
 ```bash
-# If you have the code in a directory
-cd gmaps_scraper
+git clone https://github.com/YOUR_USERNAME/gmaps-scraper.git
+cd gmaps-scraper
 ```
 
-### 2. Create Virtual Environment (Recommended)
-
-```bash
-# macOS/Linux
-python3 -m venv venv
-source venv/bin/activate
-
-# Windows
-python -m venv venv
-venv\Scripts\activate
-```
-
-### 3. Install Dependencies
+### 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Install ChromeDriver
+### 3. Run the Scraper
 
-The scraper uses Chrome WebDriver. You can either:
+**Option A: Using Streamlit Web Interface (Recommended)**
 
-**Option A: Automatic (Recommended)**
 ```bash
-pip install webdriver-manager
+streamlit run app.py
 ```
 
-**Option B: Manual**
-1. Download ChromeDriver from: https://chromedriver.chromium.org/
-2. Place it in your PATH or specify path in config
+Then open your browser to `http://localhost:8501`
+
+**Option B: Using Python Script**
+
+```bash
+python example.py
+```
+
+**Option C: Using Command Line**
+
+```bash
+python main.py
+```
+
+## 📁 Project Structure
+
+```
+gmaps-scraper/
+├── app.py                 # Streamlit web interface
+├── main.py               # Command-line interface
+├── example.py            # Basic usage example
+├── example_subdistrict.py # Subdistrict example
+├── requirements.txt      # Python dependencies
+│
+├── config/
+│   └── settings.py       # Configuration settings
+│
+├── core/
+│   ├── driver_manager.py    # Chrome driver management
+│   ├── search_engine.py     # Google Maps search logic
+│   └── orchestrator.py      # Multi-threaded orchestration
+│
+├── models/
+│   └── place.py          # Data models
+│
+├── utils/
+│   ├── extractors.py     # Data extraction utilities
+│   └── task_generator.py # Task generation
+│
+└── data/
+    ├── example_keywords.csv   # Sample keywords
+    └── example_locations.csv  # Sample locations
+```
 
 ## 📖 Usage
 
-### Example 1: Scrape Warung Kelontong in Jakarta Selatan
+### Web Interface (Streamlit)
 
-```bash
-python example_jaksel.py
-```
+1. **Upload CSV files:**
+   - Keywords file: One keyword per row
+   - Locations file: district, city columns (optional: subdistrict)
 
-This will scrape:
-- Keywords: warung kelontong, toko kelontong, minimarket
-- Locations: All 10 districts in Jakarta Selatan
-- Total tasks: 30 (3 keywords × 10 districts)
+2. **Configure settings:**
+   - Max results per task (5-500)
+   - Number of threads (1-10)
+   - Scroll settings
+   - Delays
 
-### Example 2: Custom Keywords and Locations
+3. **Start scraping!**
 
-```bash
-python example_custom.py
-```
+4. **Download results** in CSV or Excel format
 
-Or create your own script:
+### Python Script
 
 ```python
-from gmaps_scraper.config.settings import ScraperConfig
-from gmaps_scraper.core.orchestrator import ScraperOrchestrator
-from gmaps_scraper.utils.task_generator import TaskGenerator
+from config.settings import ScraperConfig
+from core.orchestrator import ScraperOrchestrator
+from models.place import SearchTask
 
 # Configure
 config = ScraperConfig(
-    headless=False,      # Set True to hide browser
-    max_workers=4,       # Number of threads
-    scroll_pause_time=2.0,
+    headless=True,
+    max_workers=4,
     max_scroll_attempts=10
 )
 
-# Define what to search
-keywords = ["warung kelontong", "minimarket"]
-locations = [
-    "Kebayoran Baru, Jakarta Selatan",
-    "Cilandak, Jakarta Selatan"
+# Create tasks
+tasks = [
+    SearchTask(
+        keyword="restaurant",
+        location="Jakarta Selatan, Jakarta",
+        max_results=30
+    )
 ]
-
-# Generate tasks
-tasks = TaskGenerator.generate_tasks(
-    keywords=keywords,
-    locations=locations,
-    max_results_per_task=50
-)
 
 # Run scraper
 orchestrator = ScraperOrchestrator(config)
 df = orchestrator.scrape_tasks(tasks)
 
 # Save results
-orchestrator.save_results(df, prefix="my_scrape")
+df.to_csv('results.csv', index=False)
+print(f"Scraped {len(df)} places!")
 ```
 
-## ⚙️ Configuration Options
+## 📊 CSV File Formats
+
+### Keywords File (`keywords.csv`)
+
+```csv
+keyword
+restaurant
+cafe
+hotel
+```
+
+### Locations File (`locations.csv`)
+
+**Basic format (district + city):**
+```csv
+district,city
+Menteng,Jakarta Pusat
+Kebayoran Baru,Jakarta Selatan
+```
+
+**With subdistrict:**
+```csv
+subdistrict,district,city
+Senayan,Kebayoran Baru,Jakarta Selatan
+Menteng Dalam,Tebet,Jakarta Selatan
+```
+
+## 🔧 Configuration Options
 
 ```python
-ScraperConfig(
-    headless=False,              # Run browser in background
-    scroll_pause_time=2.0,       # Pause between scrolls (seconds)
-    max_scroll_attempts=10,      # Max scrolls per search
-    page_load_timeout=30,        # Page load timeout (seconds)
-    element_wait_timeout=10,     # Element wait timeout (seconds)
-    max_retries=3,               # Retry attempts for failed searches
-    min_delay=1.0,               # Min delay between actions
-    max_delay=3.0,               # Max delay between actions
-    max_workers=4,               # Number of parallel threads
-    output_dir="results",        # Output directory
-    language="id",               # Browser language
-    proxy=None                   # Proxy server (optional)
+config = ScraperConfig(
+    headless=True,              # Run browser in headless mode
+    max_workers=4,              # Number of parallel threads
+    max_scroll_attempts=20,     # Max scrolls per search
+    scroll_pause_time=2.0,      # Pause between scrolls
+    min_delay=1.0,              # Min delay between actions
+    max_delay=3.0,              # Max delay between actions
+    element_wait_timeout=15,    # Wait timeout for elements
+    page_load_timeout=60        # Page load timeout
 )
 ```
 
-## 📊 Output Data
+## 📦 Output Data
 
-Each place contains:
+Each scraped place includes:
 
 | Field | Description |
 |-------|-------------|
 | name | Business name |
 | category | Business category |
 | address | Full address |
-| district | Kecamatan |
-| city | City name |
+| subdistrict | Subdistrict/Kelurahan |
+| district | District/Kecamatan |
+| city | City |
 | province | Province |
 | zip_code | Postal code |
-| latitude | GPS latitude |
-| longitude | GPS longitude |
+| latitude | Latitude coordinate |
+| longitude | Longitude coordinate |
 | rating | Average rating (1-5) |
 | reviews_count | Number of reviews |
 | phone | Phone number |
 | website | Website URL |
-| google_maps_link | Google Maps URL |
+| google_maps_link | Google Maps link |
 | opening_hours | Opening hours |
 | star_1 to star_5 | Star distribution |
-| search_keyword | Keyword used |
-| search_location | Location searched |
+| search_keyword | Search keyword used |
+| search_location | Search location used |
 | scraped_at | Timestamp |
 
-## 🎯 Common Use Cases
+## 🛠️ Advanced Usage
 
-### 1. Scrape All Districts in a City
-
-```python
-from gmaps_scraper.utils.task_generator import (
-    TaskGenerator, 
-    JAKARTA_SELATAN_DISTRICTS
-)
-
-tasks = TaskGenerator.generate_district_tasks(
-    keywords=["apotek", "klinik"],
-    city="Jakarta Selatan",
-    districts=JAKARTA_SELATAN_DISTRICTS,
-    max_results_per_task=30
-)
-```
-
-### 2. Scrape Specific Areas
+### Generate Tasks from DataFrames
 
 ```python
-tasks = TaskGenerator.generate_tasks(
-    keywords=["cafe", "coffee shop"],
-    locations=[
-        "Kemang, Jakarta Selatan",
-        "Senopati, Jakarta Selatan",
-        "Blok M, Jakarta Selatan"
-    ],
+import pandas as pd
+from utils.task_generator import TaskGenerator
+
+keywords_df = pd.read_csv('keywords.csv')
+locations_df = pd.read_csv('locations.csv')
+
+tasks = TaskGenerator.generate_from_dataframe(
+    keywords_df=keywords_df,
+    locations_df=locations_df,
     max_results_per_task=50
 )
 ```
 
-### 3. Load Tasks from CSV
-
-Create a CSV file:
-```csv
-keyword,location
-warung kelontong,Kebayoran Baru
-warung kelontong,Cilandak
-toko kelontong,Kebayoran Baru
-```
-
-Then:
-```python
-tasks = TaskGenerator.generate_from_csv(
-    'my_tasks.csv',
-    keyword_column='keyword',
-    location_column='location'
-)
-```
-
-## 🔧 Advanced Features
-
-### Multi-threading Control
+### Custom Address Parsing
 
 ```python
-# Use more threads for faster scraping (but higher resource usage)
-config = ScraperConfig(max_workers=8)
+from utils.extractors import parse_address
 
-# Use fewer threads for more stable scraping
-config = ScraperConfig(max_workers=2)
+address = "Jl. Sudirman No.1, Senayan, Kec. Kebayoran Baru, Jakarta Selatan, DKI Jakarta 12190"
+subdistrict, district, city, province, zip_code = parse_address(address)
+
+print(f"Subdistrict: {subdistrict}")  # Senayan
+print(f"District: {district}")        # Kebayoran Baru
+print(f"City: {city}")                # Jakarta Selatan
 ```
-
-### Headless Mode
-
-```python
-# For running on servers without display
-config = ScraperConfig(headless=True)
-```
-
-### Rate Limiting
-
-```python
-# Add delays to avoid detection
-config = ScraperConfig(
-    min_delay=2.0,  # Wait at least 2 seconds
-    max_delay=5.0   # Wait at most 5 seconds
-)
-```
-
-## 📝 Predefined District Lists
-
-The package includes predefined district lists:
-- `JAKARTA_SELATAN_DISTRICTS` (10 districts)
-- `JAKARTA_PUSAT_DISTRICTS` (8 districts)
-- `JAKARTA_UTARA_DISTRICTS` (6 districts)
-- `JAKARTA_TIMUR_DISTRICTS` (10 districts)
-- `JAKARTA_BARAT_DISTRICTS` (8 districts)
 
 ## ⚠️ Important Notes
 
-1. **Rate Limiting**: Don't set `max_workers` too high to avoid being blocked
-2. **Headless Mode**: More stable for long-running scrapes
-3. **Memory**: Each thread uses ~500MB RAM. Monitor your resources
-4. **Legal**: Respect Google's Terms of Service and robots.txt
-5. **Data Accuracy**: Always verify critical data from original sources
+### Rate Limiting
+- Use reasonable delays (1-3 seconds recommended)
+- Don't scrape too aggressively to avoid IP blocks
+- Consider using proxies for large-scale scraping
+
+### Resource Usage
+- Chrome browser is resource-intensive
+- Recommended: 2-4 threads on regular machines
+- More threads = faster but more memory/CPU usage
+
+### Legal Considerations
+- Review Google's Terms of Service
+- Use responsibly and ethically
+- For educational purposes only
 
 ## 🐛 Troubleshooting
 
-### "ChromeDriver not found"
+### Chrome Driver Issues
+
 ```bash
-pip install webdriver-manager
+# Update Chrome and ChromeDriver
+pip install --upgrade selenium webdriver-manager
 ```
 
-### "Connection refused" or "Timeout"
-- Reduce `max_workers`
-- Increase `page_load_timeout`
-- Check internet connection
+### Memory Issues
 
-### Getting duplicate results
-- The scraper has built-in deduplication
-- Duplicates within same run are automatically removed
-- Compare results from different runs manually
-
-### Browser not closing
+Reduce the number of threads:
 ```python
-# Use context manager for automatic cleanup
-with DriverManager(config) as dm:
-    # Your code here
-    pass
-# Browser automatically closes
+config = ScraperConfig(max_workers=2)
 ```
 
-## 📈 Performance Tips
+### Timeout Errors
 
-1. **Start Small**: Test with 1-2 tasks first
-2. **Optimize Threads**: 4-6 threads is usually optimal
-3. **Use Headless**: Faster and uses less memory
-4. **Filter Results**: Process data after scraping to remove unwanted entries
-5. **Batch Processing**: Split large jobs into smaller batches
+Increase timeout values:
+```python
+config = ScraperConfig(
+    page_load_timeout=120,
+    element_wait_timeout=30
+)
+```
 
-## 📄 License
+### Can't Find Elements
 
-This is a tool for educational purposes. Always respect:
-- Google Maps Terms of Service
-- Website robots.txt files
-- Local data protection laws
-- Rate limiting best practices
+Google Maps changes its HTML structure. Check for updates:
+```bash
+git pull origin main
+```
+
+## 📚 Examples
+
+Check the `examples/` directory for:
+- Basic scraping
+- Multi-location scraping
+- Subdistrict-level scraping
+- Custom configurations
 
 ## 🤝 Contributing
 
-Feel free to:
-- Report bugs
-- Suggest features
-- Submit pull requests
-- Share improvements
+Contributions are welcome! Please:
 
-## 📮 Support
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-For issues or questions:
-1. Check the examples
-2. Review configuration options
-3. Read error messages carefully
-4. Test with reduced `max_workers`
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [Selenium](https://www.selenium.dev/)
+- UI powered by [Streamlit](https://streamlit.io/)
+- Data processing with [Pandas](https://pandas.pydata.org/)
+
+## 📞 Support
+
+- 🐛 [Report Bug](https://github.com/YOUR_USERNAME/gmaps-scraper/issues)
+- 💡 [Request Feature](https://github.com/YOUR_USERNAME/gmaps-scraper/issues)
+- 📧 Email: your.email@example.com
+
+## ⭐ Star History
+
+If this project helped you, please give it a ⭐!
 
 ---
 
-**Happy Scraping! 🚀**# gmaps-scraper
+**Disclaimer:** This tool is for educational purposes only. Always respect website terms of service and robots.txt. Use responsibly.
