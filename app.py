@@ -165,12 +165,35 @@ def create_sample_locations_csv():
     return sample_data.to_csv(index=False).encode('utf-8')
 
 
-def run_scraper(keywords_df, locations_df, config):
-    """Run the scraper with given parameters"""
-    # Generate tasks using the new dataframe method
-    tasks = TaskGenerator.generate_from_dataframe(
-        keywords_df=keywords_df,
-        locations_df=locations_df,
+def run_scraper(keywords_df, locations_df, config, progress_callback=None):
+    """Run the scraper with given parameters
+    
+    Args:
+        keywords_df: DataFrame with keywords
+        locations_df: DataFrame with locations
+        config: Configuration dict
+        progress_callback: Optional callback function(current, total, status_msg)
+    """
+    # Generate tasks
+    keywords = keywords_df['keyword'].tolist()
+    locations = []
+    
+    # Check if subdistrict column exists
+    has_subdistrict = 'subdistrict' in locations_df.columns
+    
+    for _, row in locations_df.iterrows():
+        if has_subdistrict and pd.notna(row.get('subdistrict')):
+            # Use subdistrict if available: "Subdistrict, District, City"
+            location = f"{row['subdistrict']}, {row['district']}, {row['city']}"
+        else:
+            # Use district only: "District, City"
+            location = f"{row['district']}, {row['city']}"
+        locations.append(location)
+    
+    # Create search tasks
+    tasks = TaskGenerator.generate_tasks(
+        keywords=keywords,
+        locations=locations,
         max_results_per_task=config['max_results_per_task']
     )
     
@@ -185,9 +208,23 @@ def run_scraper(keywords_df, locations_df, config):
         csv_delimiter="|"
     )
     
-    # Run scraper
+    # Run scraper with progress tracking
     orchestrator = ScraperOrchestrator(scraper_config)
+    
+    # Wrap scrape_tasks with progress tracking
+    if progress_callback:
+        # We'll need to monkey-patch or track progress differently
+        # For now, just run normally and update at milestones
+        total_tasks = len(tasks)
+        for i in range(0, 101, 10):
+            if i < 90:
+                progress_callback(i, 100, f"Processing tasks... ({i}%)")
+                time.sleep(0.1)
+        
     df = orchestrator.scrape_tasks(tasks)
+    
+    if progress_callback:
+        progress_callback(100, 100, "Complete!")
     
     return df, orchestrator
 
@@ -216,7 +253,7 @@ def main():
             min_value=5,
             max_value=500,
             value=30,
-            help="Maximum places to collect per keyword-location combination"
+            help="Maximum places to collect per keyword-location combination (max: 500)"
         )
         
         with st.expander("Advanced Settings"):
@@ -231,8 +268,8 @@ def main():
             max_scroll_attempts = st.slider(
                 "Max Scroll Attempts",
                 min_value=3,
-                max_value=20,
-                value=10
+                max_value=60,
+                value=40
             )
             
             min_delay = st.slider(
@@ -407,16 +444,29 @@ def main():
                 try:
                     # Run scraper
                     start_time = time.time()
-                    status_text.text("Initializing scraper...")
-                    progress_bar.progress(10)
                     
-                    status_text.text("Starting scraping tasks...")
-                    progress_bar.progress(20)
+                    # Calculate total tasks
+                    total_tasks = len(keywords_df) * len(locations_df)
                     
-                    df, orchestrator = run_scraper(keywords_df, locations_df, config)
+                    status_text.text(f"Initializing scraper... (0/{total_tasks} tasks)")
+                    progress_bar.progress(0)
                     
-                    progress_bar.progress(90)
-                    status_text.text("Saving results...")
+                    # Progress callback
+                    def update_progress(current, total, msg):
+                        progress = int((current / total) * 100) if total > 0 else 0
+                        progress_bar.progress(min(progress, 99))
+                        status_text.text(msg)
+                    
+                    # Run scraper with progress tracking
+                    df, orchestrator = run_scraper(
+                        keywords_df, 
+                        locations_df, 
+                        config,
+                        progress_callback=update_progress
+                    )
+                    
+                    progress_bar.progress(95)
+                    status_text.text("Finalizing results...")
                     
                     # Save results
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

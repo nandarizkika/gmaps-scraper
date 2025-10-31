@@ -62,16 +62,13 @@ class ScraperOrchestrator:
                 try:
                     places = future.result()
                     
-                    # Thread-safe addition of results
+                    # Thread-safe addition of all results (including duplicates)
                     with self.lock:
-                        for place in places:
-                            if place.google_maps_link not in self.seen_links:
-                                self.seen_links.add(place.google_maps_link)
-                                self.results.append(place)
+                        self.results.extend(places)
                     
                     print(f"\n[{completed}/{len(tasks)}] Completed: {task}")
-                    print(f"  Found {len(places)} new places")
-                    print(f"  Total unique places so far: {len(self.results)}")
+                    print(f"  Found {len(places)} places")
+                    print(f"  Total places so far: {len(self.results)}")
                     
                 except Exception as e:
                     print(f"\n[{completed}/{len(tasks)}] Failed: {task}")
@@ -80,7 +77,7 @@ class ScraperOrchestrator:
         elapsed = time.time() - start_time
         print(f"\n{'='*70}")
         print(f"Scraping completed in {elapsed:.2f} seconds")
-        print(f"Total unique places collected: {len(self.results)}")
+        print(f"Total places collected: {len(self.results)}")
         print(f"{'='*70}\n")
         
         # Convert to DataFrame
@@ -104,7 +101,7 @@ class ScraperOrchestrator:
         
         # Reorder columns for better readability
         column_order = [
-            'name', 'category', 'address','subdistrict', 'district', 'city', 'province', 'zip_code',
+            'name', 'category', 'address', 'subdistrict', 'district', 'city', 'province', 'zip_code',
             'latitude', 'longitude', 'rating', 'reviews_count',
             'phone', 'website', 'google_maps_link', 'opening_hours',
             'star_1', 'star_2', 'star_3', 'star_4', 'star_5',
@@ -191,13 +188,6 @@ class ScraperOrchestrator:
             for district, count in district_counts.items():
                 if district:
                     print(f"  - {district}: {count}")
-        
-        if 'subdistrict' in df.columns:
-            print(f"\nPlaces by District:")
-            subdistrict_counts = df['subdistrict'].value_counts().head(10)
-            for subdistrict, count in subdistrict_counts.items():
-                if subdistrict:
-                    print(f"  - {subdistrict}: {count}")
         
         if 'rating' in df.columns:
             ratings = df['rating'].dropna()
