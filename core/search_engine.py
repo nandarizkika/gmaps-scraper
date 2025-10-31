@@ -1,6 +1,7 @@
 """
 Search engine for Google Maps
 """
+import re
 import time
 import random
 from typing import List, Set, Optional
@@ -242,13 +243,167 @@ class MapsSearchEngine:
             link = self.driver.current_url
             latitude, longitude = extract_coordinates_from_link(link)
             
-            # Extract rating
-            rating_text = self._extract_text('div.F7nice span[aria-hidden="true"], span.ceNzKf')
-            rating = parse_rating(rating_text)
+            # Extract rating - try multiple methods
+            rating = None
+            rating_text = None
             
-            # Extract reviews
-            reviews_text = self._extract_text('div.F7nice span[aria-label*="reviews"], span.UY7F9, button[aria-label*="reviews"]')
+            # Method 1: Get from parent container (gets full "4.5" text)
+            try:
+                rating_container = self.driver.find_element(By.CSS_SELECTOR, 'div.F7nice')
+                full_text = rating_container.text
+                # Extract rating from text like "4.5" or "4.5 (123 reviews)"
+                match = re.search(r'(\d+[.,]\d+)', full_text)
+                if match:
+                    rating_text = match.group(1).replace(',', '.')
+            except:
+                pass
+            
+            # Method 2: Standard selectors (fallback)
+            if not rating_text:
+                rating_text = self._extract_text('div.F7nice span[aria-hidden="true"], span.ceNzKf[aria-hidden="true"]')
+            
+            # Method 3: Try aria-label on button
+            if not rating_text:
+                try:
+                    rating_button = self.driver.find_element(By.CSS_SELECTOR, 'button[aria-label*="stars"], button[aria-label*="rating"]')
+                    aria = rating_button.get_attribute('aria-label')
+                    if aria:
+                        match = re.search(r'(\d+[.,]\d+)', aria)
+                        if match:
+                            rating_text = match.group(1).replace(',', '.')
+                except:
+                    pass
+            
+            # Method 4: Look for any element with rating pattern
+            if not rating_text:
+                try:
+                    # Search all text on page for rating pattern near reviews
+                    all_text = self.driver.find_element(By.CSS_SELECTOR, 'div.m6QErb').text
+                    # Pattern: number followed by reviews/stars
+                    match = re.search(r'(\d+[.,]\d+)\s*(?:\(|stars|reviews)', all_text, re.IGNORECASE)
+                    if match:
+                        rating_text = match.group(1).replace(',', '.')
+                except:
+                    pass
+            
+            rating = parse_rating(rating_text)
+            print(f"    📍 Rating text: '{rating_text}' → Parsed: {rating}")
+            
+            # Extract reviews - must get from individual place details, not search results
+            reviews_count = None
+            reviews_text = None
+            
+            # Method 1: Get from rating container (most specific)
+            try:
+                rating_section = self.driver.find_element(By.CSS_SELECTOR, 'div.F7nice')
+                reviews_elem = rating_section.find_element(By.CSS_SELECTOR, 'span[aria-label*="reviews"], button[aria-label*="reviews"]')
+                reviews_text = reviews_elem.get_attribute('aria-label')
+                if not reviews_text:
+                    reviews_text = reviews_elem.text
+                print(f"    🔍 Method 1 (rating section): '{reviews_text}'")
+            except Exception as e:
+                print(f"    ⚠️  Method 1 failed: {e}")
+            
+            # Method 2: Try to find review count in rating section text
+            if not reviews_text:
+                try:
+                    rating_section = self.driver.find_element(By.CSS_SELECTOR, 'div.F7nice')
+                    full_text = rating_section.text
+                    print(f"    🔍 Method 2 (section text): '{full_text}'")
+                    # Pattern: "(123)" or "(1,234)" or "(1.234)" after rating
+                    match = re.search(r'\(([0-9.,\s]+)\)', full_text)
+                    if match:
+                        reviews_text = match.group(1)
+                        print(f"    ✓ Extracted from pattern: '{reviews_text}'")
+                except Exception as e:
+                    print(f"    ⚠️  Method 2 failed: {e}")
+            
+            # Method 3: Look for any button with review count
+            if not reviews_text:
+                try:
+                    review_buttons = self.driver.find_elements(By.CSS_SELECTOR, 'button[jsaction*="reviews"], button.HHrUdb, button[aria-label*="review"]')
+                    print(f"    🔍 Method 3: Found {len(review_buttons)} review buttons")
+                    for idx, btn in enumerate(review_buttons):
+                        text = btn.text
+                        aria = btn.get_attribute('aria-label')
+                        print(f"      Button {idx}: text='{text}', aria='{aria}'")
+                        
+                        # Check aria-label first
+                        if aria and 'review' in aria.lower():
+                            match = re.search(r'([0-9.,\s]+)', aria)
+                            if match:
+                                reviews_text = match.group(1)
+                                print(f"    ✓ Got from button aria: '{reviews_text}'")
+                                break
+                        
+                        # Check button text
+                        if text and 'review' in text.lower():
+                            match = re.search(r'([0-9.,\s]+)', text)
+                            if match:
+                                reviews_text = match.group(1)
+                                print(f"    ✓ Got from button text: '{reviews_text}'")
+                                break
+                except Exception as e:
+                    print(f"    ⚠️  Method 3 failed: {e}")
+            
+            # Method 4: Search in details panel (first few lines only)
+            if not reviews_text:
+                try:
+                    details_panel = self.driver.find_element(By.CSS_SELECTOR, 'div.m6QErb[aria-label]')
+                    lines = details_panel.text.split('\n')[0:10]
+                    print(f"    🔍 Method 4: Searching in {len(lines)} lines")
+                    for idx, line in enumerate(lines):
+                        # Look for line with just rating and reviews: "4.5 (123)"
+                        match = re.search(r'(\d+[.,]\d+).*?\(([0-9.,\s]+)\)', line)
+                        if match:
+                            reviews_text = match.group(2)
+                            print(f"    ✓ Found in line {idx}: '{line}' → '{reviews_text}'")
+                            break
+                except Exception as e:
+                    print(f"    ⚠️  Method 4 failed: {e}")
+            
+            # Method 5: Look for review text/link directly
+            if not reviews_text:
+                try:
+                    # Sometimes reviews are in a link or span with specific text
+                    review_elements = self.driver.find_elements(By.XPATH, 
+                        "//*[contains(text(), 'review') or contains(text(), 'Review')]")
+                    print(f"    🔍 Method 5: Found {len(review_elements)} elements with 'review'")
+                    for idx, elem in enumerate(review_elements[:5]):  # Check first 5
+                        text = elem.text
+                        print(f"      Element {idx}: '{text}'")
+                        match = re.search(r'([0-9.,\s]+)\s*review', text, re.IGNORECASE)
+                        if match:
+                            reviews_text = match.group(1)
+                            print(f"    ✓ Got from element: '{reviews_text}'")
+                            break
+                except Exception as e:
+                    print(f"    ⚠️  Method 5 failed: {e}")
+            
+            # Method 6: Get from page source as last resort
+            if not reviews_text:
+                try:
+                    page_source = self.driver.page_source
+                    # Look for common review patterns in HTML
+                    patterns = [
+                        r'aria-label="([0-9.,\s]+)\s*reviews?"',
+                        r'"reviews?["\s:]+([0-9.,\s]+)',
+                        r'reviewCount["\s:]+([0-9.,\s]+)',
+                    ]
+                    for pattern in patterns:
+                        match = re.search(pattern, page_source, re.IGNORECASE)
+                        if match:
+                            reviews_text = match.group(1)
+                            print(f"    ✓ Found in source with pattern '{pattern}': '{reviews_text}'")
+                            break
+                except Exception as e:
+                    print(f"    ⚠️  Method 6 failed: {e}")
+            
             reviews_count = parse_reviews_count(reviews_text)
+            print(f"    📍 Reviews FINAL: '{reviews_text}' → Parsed: {reviews_count}")
+            
+            if not reviews_count:
+                print(f"    ❌ WARNING: Could not extract review count!")
             
             # Extract phone
             phone = self._extract_text('button[data-item-id*="phone"]')

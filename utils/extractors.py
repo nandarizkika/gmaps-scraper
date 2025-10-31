@@ -199,27 +199,66 @@ def clean_text(text: Optional[str]) -> Optional[str]:
 
 
 def parse_rating(rating_text: Optional[str]) -> Optional[float]:
-    """Extract rating from text"""
+    """Extract rating from text - handles various formats like 4.5, 4,5, etc."""
     if not rating_text:
         return None
     try:
-        match = re.search(r'(\d+\.?\d*)', rating_text)
-        if match:
-            return float(match.group(1))
-    except:
+        # Clean the text
+        text = str(rating_text).strip()
+        
+        # Replace comma with period (for European format like "4,5")
+        text = text.replace(',', '.')
+        
+        # Try different patterns in order of specificity
+        patterns = [
+            r'(\d+\.\d+)',  # Match decimal first: 4.5, 3.6
+            r'(\d+)',       # Then match integer: 4, 3
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                rating = float(match.group(1))
+                # Validate range (Google ratings are 1.0 to 5.0)
+                if 0 <= rating <= 5:
+                    return rating
+                    
+    except Exception as e:
+        print(f"Error parsing rating '{rating_text}': {e}")
         pass
     return None
 
 
 def parse_reviews_count(reviews_text: Optional[str]) -> Optional[int]:
-    """Extract review count from text"""
+    """Extract review count from text - handles various formats"""
     if not reviews_text:
         return None
     try:
-        # Remove commas and extract number
-        number_text = re.sub(r'[^\d]', '', reviews_text)
-        if number_text:
+        # Clean the text
+        text = str(reviews_text).strip()
+        
+        # Handle formats:
+        # "123 reviews"
+        # "(123)"
+        # "1,234 reviews"
+        # "1.234 reviews" (European)
+        # "1 234 reviews" (space separator)
+        
+        # Remove common words
+        text = text.lower().replace('reviews', '').replace('review', '').strip()
+        
+        # Remove parentheses
+        text = text.replace('(', '').replace(')', '').strip()
+        
+        # Remove all non-digit characters except commas, dots, and spaces
+        # Then remove commas, dots, and spaces to get pure number
+        number_text = re.sub(r'[^\d,.\s]', '', text)
+        number_text = number_text.replace(',', '').replace('.', '').replace(' ', '')
+        
+        if number_text and number_text.isdigit():
             return int(number_text)
-    except:
+            
+    except Exception as e:
+        print(f"Error parsing reviews count '{reviews_text}': {e}")
         pass
     return None

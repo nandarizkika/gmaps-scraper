@@ -70,6 +70,49 @@ class ScraperOrchestrator:
                     print(f"  Found {len(places)} places")
                     print(f"  Total places so far: {len(self.results)}")
                     
+                    # Save THIS task's results immediately to its own CSV
+                    try:
+                        if len(places) > 0:
+                            # Create DataFrame for just this task
+                            task_df = pd.DataFrame([place.to_dict() for place in places])
+                            
+                            # Reorder columns
+                            column_order = [
+                                'name', 'category', 'address', 'subdistrict', 'district', 'city', 'province', 'zip_code',
+                                'latitude', 'longitude', 'rating', 'reviews_count',
+                                'phone', 'website', 'google_maps_link', 'opening_hours',
+                                'star_1', 'star_2', 'star_3', 'star_4', 'star_5',
+                                'search_keyword', 'search_location', 'scraped_at'
+                            ]
+                            column_order = [col for col in column_order if col in task_df.columns]
+                            task_df = task_df[column_order]
+                            
+                            # Create safe filename from task
+                            safe_keyword = task.keyword.replace(' ', '_').replace('/', '_')
+                            safe_location = task.location.replace(' ', '_').replace(',', '').replace('/', '_')
+                            task_filename = f"task_{completed:03d}_{safe_keyword}_{safe_location}.csv"
+                            
+                            task_csv = os.path.join(
+                                self.config.output_dir,
+                                task_filename
+                            )
+                            
+                            # Save immediately - this task only
+                            task_df.to_csv(task_csv, index=False, sep='|')
+                            print(f"  💾 Saved task file: {task_filename} ({len(places)} places)")
+                        
+                        # Also update the combined incremental file
+                        incremental_df = self._create_dataframe()
+                        incremental_csv = os.path.join(
+                            self.config.output_dir,
+                            "incremental_all.csv"
+                        )
+                        incremental_df.to_csv(incremental_csv, index=False, sep='|')
+                        print(f"  💾 Updated combined: incremental_all.csv ({len(self.results)} total places)")
+                        
+                    except Exception as e:
+                        print(f"  ⚠️  Save failed: {e}")
+                    
                 except Exception as e:
                     print(f"\n[{completed}/{len(tasks)}] Failed: {task}")
                     print(f"  Error: {e}")
@@ -81,7 +124,31 @@ class ScraperOrchestrator:
         print(f"{'='*70}\n")
         
         # Convert to DataFrame
-        return self._create_dataframe()
+        df = self._create_dataframe()
+        
+        # Auto-save final results (insurance against Streamlit disconnection)
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            final_csv = os.path.join(
+                self.config.output_dir,
+                f"final_results_{timestamp}.csv"
+            )
+            final_excel = os.path.join(
+                self.config.output_dir,
+                f"final_results_{timestamp}.xlsx"
+            )
+            
+            df.to_csv(final_csv, index=False, sep='|')
+            df.to_excel(final_excel, index=False, engine='openpyxl')
+            
+            print(f"💾 Auto-saved results:")
+            print(f"   CSV:   {final_csv}")
+            print(f"   Excel: {final_excel}")
+            print(f"{'='*70}\n")
+        except Exception as e:
+            print(f"⚠️  Auto-save failed: {e}")
+        
+        return df
     
     def _execute_task(self, task: SearchTask) -> List[Place]:
         """Execute a single search task (runs in separate thread)"""
